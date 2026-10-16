@@ -65,6 +65,13 @@ jobs:
           PYEOF
           python3 /tmp/patch.py LanChat/app/src/main/java/com/example/lanchat/ChatNet.kt
 
+      - name: Fix foreground service crash on Android 14
+        run: |
+          M=LanChat/app/src/main/AndroidManifest.xml
+          sed -i 's#android:name=".ChatService"#android:name=".ChatService"\n            android:foregroundServiceType="dataSync"#' $M
+          sed -i 's#<uses-permission android:name="android.permission.FOREGROUND_SERVICE" />#&\n    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_DATA_SYNC" />#' $M
+          sed -i 's#startForeground(101, notification)#if (Build.VERSION.SDK_INT >= 29) startForeground(101, notification, android.content.pm.ServiceInfo.FOREGROUND_SERVICE_TYPE_DATA_SYNC) else startForeground(101, notification)#' LanChat/app/src/main/java/com/example/lanchat/ChatService.kt
+
       - name: Build APK
         run: |
           cd LanChat
