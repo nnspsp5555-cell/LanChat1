@@ -32,15 +32,48 @@ jobs:
         run: |
           grep -rl "@mipmap/ic_launcher" LanChat/app/src/main | xargs sed -i 's#@mipmap/ic_launcher_round#@android:drawable/sym_def_app_icon#g; s#@mipmap/ic_launcher#@android:drawable/sym_def_app_icon#g'
 
+      - name: Fix Kotlin withContext inside synchronized
+        run: |
+          cat > /tmp/patch.py << 'PYEOF'
+          import re, sys
+          p = sys.argv[1]
+          s = open(p, encoding='utf-8').read()
+          old1 = re.compile(r'( *)synchronized\(knownDevices\) \{\n\s*for \(peer in knownDevices\.values\) \{\n\s*if \(peer\.isOnline && \(now - peer\.lastSeen > 20000\)\) \{\n\s*peer\.isOnline = false\n\s*withContext\(Dispatchers\.Main\) \{\n\s*onDeviceStatusChanged\(peer\)\n\s*\}\n\s*\}\n\s*\}\n\s*\}\n')
+          new1 = (r'\1val timedOutPeers = synchronized(knownDevices) {' + '\n'
+                  r'\1    knownDevices.values.filter { it.isOnline && (now - it.lastSeen > 20000) }.onEach { it.isOnline = false }' + '\n'
+                  r'\1}' + '\n'
+                  r'\1for (peer in timedOutPeers) {' + '\n'
+                  r'\1    withContext(Dispatchers.Main) {' + '\n'
+                  r'\1        onDeviceStatusChanged(peer)' + '\n'
+                  r'\1    }' + '\n'
+                  r'\1}' + '\n')
+          s, n1 = old1.subn(new1, s)
+          old2 = re.compile(r'( *)synchronized\(knownDevices\) \{\n\s*val peer = knownDevices\[senderId\]\n\s*if \(peer != null\) \{\n\s*peer\.pingMs = latency\n\s*withContext\(Dispatchers\.Main\) \{\n\s*onDeviceStatusChanged\(peer\)\n\s*\}\n\s*\}\n\s*\}\n')
+          new2 = (r'\1val pongPeer = synchronized(knownDevices) {' + '\n'
+                  r'\1    val p = knownDevices[senderId]' + '\n'
+                  r'\1    if (p != null) p.pingMs = latency' + '\n'
+                  r'\1    p' + '\n'
+                  r'\1}' + '\n'
+                  r'\1if (pongPeer != null) {' + '\n'
+                  r'\1    withContext(Dispatchers.Main) {' + '\n'
+                  r'\1        onDeviceStatusChanged(pongPeer)' + '\n'
+                  r'\1    }' + '\n'
+                  r'\1}' + '\n')
+          s, n2 = old2.subn(new2, s)
+          print("patched", n1, n2)
+          open(p, 'w', encoding='utf-8').write(s)
+          PYEOF
+          python3 /tmp/patch.py LanChat/app/src/main/java/com/example/lanchat/ChatNet.kt
+
       - name: Build APK
         run: |
           cd LanChat
           gradle assembleDebug --no-daemon --console=plain 2>&1 | tee build.log; test ${PIPESTATUS[0]} -eq 0
-        
+
       - name: Show errors only
         if: failure()
         run: |
-          grep -nE "^e: |error:|What went wrong|Execution failed|> " LanChat/build.log | grep -v "Task :" | head -40
+          grep -nE "^e: |error:|What went wrong|Execution failed" LanChat/build.log | head -40
 
       - uses: actions/upload-artifact@v4
         with:
