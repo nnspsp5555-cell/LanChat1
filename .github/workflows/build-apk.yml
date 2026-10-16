@@ -35,10 +35,14 @@ jobs:
       - name: Build APK
         run: |
           cd LanChat
-          gradle assembleDebug --no-daemon --stacktrace
+          gradle assembleDebug --no-daemon --console=plain 2>&1 | tee build.log; test ${PIPESTATUS[0]} -eq 0
+        
+      - name: Show errors only
+        if: failure()
+        run: |
+          grep -nE "^e: |error:|What went wrong|Execution failed|> " LanChat/build.log | grep -v "Task :" | head -40
 
       - uses: actions/upload-artifact@v4
         with:
           name: LanChat-APK
           path: LanChat/app/build/outputs/apk/debug/*.apk
-          
