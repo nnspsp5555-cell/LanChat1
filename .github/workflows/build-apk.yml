@@ -30,7 +30,7 @@ jobs:
 
       - name: Fix missing app icon
         run: |
-          sed -i 's#@mipmap/ic_launcher_round#@android:drawable/sym_def_app_icon#g; s#@mipmap/ic_launcher#@android:drawable/sym_def_app_icon#g' LanChat/app/src/main/AndroidManifest.xml
+          grep -rl "@mipmap/ic_launcher" LanChat/app/src/main | xargs sed -i 's#@mipmap/ic_launcher_round#@android:drawable/sym_def_app_icon#g; s#@mipmap/ic_launcher#@android:drawable/sym_def_app_icon#g'
 
       - name: Build APK
         run: |
@@ -41,3 +41,4 @@ jobs:
         with:
           name: LanChat-APK
           path: LanChat/app/build/outputs/apk/debug/*.apk
+          
