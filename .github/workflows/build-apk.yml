@@ -28,6 +28,10 @@ jobs:
             [ -f "$f" ] && unzip -o "$f" -x ".github/*"
           done
 
+      - name: Fix missing app icon
+        run: |
+          sed -i 's#@mipmap/ic_launcher_round#@android:drawable/sym_def_app_icon#g; s#@mipmap/ic_launcher#@android:drawable/sym_def_app_icon#g' LanChat/app/src/main/AndroidManifest.xml
+
       - name: Build APK
         run: |
           cd LanChat
